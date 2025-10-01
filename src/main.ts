@@ -9,9 +9,12 @@ async function bootstrap() {
   // Configuración para trabajar con Gateway
   app.enableCors({
     origin: [
-      'http://localhost:3000', // Gateway
+      'http://localhost:3000', // Gateway local
       'http://localhost:3001', // Frontend dev
       'http://localhost:8080', // Frontend prod
+      'http://localhost:5173', // Frontend Vite
+      'https://citylights-gateway-production.up.railway.app', // Gateway producción
+      'https://citylights-frontend-production.up.railway.app', // Frontend producción (si lo tienes)
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
