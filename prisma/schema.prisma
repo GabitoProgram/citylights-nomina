@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trabajador {
+  id                Int      @id @default(autoincrement())
+  nombre           String
+  sueldo           Float
+  tipo             String
+  metodoPago       String   @default("TRANSFERENCIA") // TRANSFERENCIA, EFECTIVO, CHEQUE
+  numeroCuenta     String?  // Para transferencias
+  banco            String?  // Para transferencias
+  telefono         String?
+  email            String?
+  fechaContrato    DateTime @default(now())
+  estado           String   @default("ACTIVO") // ACTIVO, INACTIVO
+  nominas          Nomina[]
+}
+
+model Nomina {
+  id           Int      @id @default(autoincrement())
+  trabajador   Trabajador @relation(fields: [trabajadorId], references: [id])
+  trabajadorId Int
+  cantidad     Float
+  extra        Float
+  is_user      String
+  fecha        DateTime @default(now())
+  pagos        Pagar[]
+}
+
+model Pagar {
+  id          Int      @id @default(autoincrement())
+  nomina      Nomina   @relation(fields: [nominaId], references: [id])
+  nominaId    Int
+  is_user     String
+  monto       Float
+  metodoPago  String   @default("TRANSFERENCIA") // TRANSFERENCIA, EFECTIVO, CHEQUE
+  estado      String   @default("PENDIENTE") // PENDIENTE, COMPLETADO, FALLIDO
+  referencia  String?  // Número de referencia del pago
+  fecha       DateTime @default(now())
+  fechaPago   DateTime?
+}
