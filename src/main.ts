@@ -39,8 +39,9 @@ async function bootstrap() {
   // Configurar prefijo global para todas las rutas
   app.setGlobalPrefix('api');
   
-  await app.listen(3005);
-  logger.log(`🚀 Nomina Microservice running on: http://localhost:3005`);
+  const port = process.env.PORT || 3005;
+  await app.listen(port);
+  logger.log(`🚀 Nomina Microservice running on: http://localhost:${port}`);
   logger.log(`📊 Ready to receive requests from Gateway`);
 }
 bootstrap();
