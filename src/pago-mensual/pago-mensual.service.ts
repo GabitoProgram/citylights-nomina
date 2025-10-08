@@ -299,4 +299,85 @@ export class PagoMensualService {
       ]
     });
   }
+
+  /**
+   * Confirmar pago de cuota mensual vía webhook de Stripe
+   */
+  async confirmarPagoCuotaResidente(sessionId: string) {
+    try {
+      this.logger.log(`✅ Confirmando pago de cuota con session: ${sessionId}`);
+
+      // Buscar la cuota por session ID
+      const cuota = await this.prisma.cuotaMensualResidente.findFirst({
+        where: { stripeSessionId: sessionId }
+      });
+
+      if (!cuota) {
+        throw new BadRequestException('Cuota no encontrada para esta sesión');
+      }
+
+      if (cuota.estado === 'PAGADO') {
+        this.logger.log(`⚠️ Cuota ${cuota.id} ya estaba marcada como pagada`);
+        return { success: true, cuota, yaEstabaPageada: true };
+      }
+
+      // Actualizar estado de la cuota
+      const cuotaActualizada = await this.prisma.cuotaMensualResidente.update({
+        where: { id: cuota.id },
+        data: {
+          estado: 'PAGADO',
+          fechaPago: new Date(),
+          metodoPago: 'STRIPE'
+        }
+      });
+
+      this.logger.log(`✅ Cuota ${cuota.id} marcada como pagada exitosamente`);
+
+      return {
+        success: true,
+        cuota: cuotaActualizada,
+        yaEstabaPageada: false
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Error confirmando pago: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Generar cuotas mensuales automáticamente para todos los residentes activos
+   */
+  async generarCuotasMensualesAutomaticas(residentes: Array<{userId: string, userName: string, userEmail: string}>) {
+    const resultados = [];
+    
+    for (const residente of residentes) {
+      try {
+        const resultado = await this.crearCuotaMensualResidente(
+          residente.userId, 
+          residente.userName, 
+          residente.userEmail
+        );
+        resultados.push({
+          userId: residente.userId,
+          success: true,
+          cuota: resultado.cuota,
+          yaExistia: resultado.cuotaExistente
+        });
+      } catch (error) {
+        resultados.push({
+          userId: residente.userId,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      totalProcesados: residentes.length,
+      exitosos: resultados.filter(r => r.success).length,
+      errores: resultados.filter(r => !r.success).length,
+      detalles: resultados
+    };
+  }
 }
