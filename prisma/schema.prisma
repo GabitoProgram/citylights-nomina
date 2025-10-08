@@ -70,10 +70,15 @@ model CuotaMensualResidente {
   userEmail   String   // Email del residente
   anio        Int      // Año de la cuota
   mes         Int      // Mes de la cuota (1-12)
-  monto       Float    @default(100.0) // Cuota fija de $100
-  estado      String   @default("PENDIENTE") // PENDIENTE, PAGADO, VENCIDO
+  monto       Float    @default(100.0) // Cuota base de $100
+  montoMorosidad Float @default(0.0) // Recargo por morosidad
+  montoTotal  Float    @default(100.0) // Monto total a pagar (cuota + morosidad)
+  estado      String   @default("PENDIENTE") // PENDIENTE, PAGADO, VENCIDO, MOROSO
   fechaVencimiento DateTime // Fecha límite de pago
+  fechaVencimientoGracia DateTime? // Fecha límite con período de gracia
   fechaPago   DateTime? // Fecha en que se realizó el pago
+  diasMorosidad Int    @default(0) // Días de retraso en el pago
+  porcentajeMorosidad Float @default(10.0) // Porcentaje de recargo por morosidad
   metodoPago  String?  // Método usado para el pago
   referencia  String?  // Número de referencia del pago
   stripeSessionId String? // ID de la sesión de Stripe

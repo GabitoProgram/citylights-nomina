@@ -156,4 +156,20 @@ export class PagoMensualController {
       }
     };
   }
+
+  /**
+   * 🚨 MOROSIDAD: Verificar y aplicar morosidad a cuotas vencidas
+   */
+  @Post('morosidad/verificar')
+  async verificarMorosidad() {
+    return this.pagoMensualService.verificarYAplicarMorosidad();
+  }
+
+  /**
+   * 📊 MOROSIDAD: Obtener resumen de cuotas con morosidad
+   */
+  @Get('morosidad/resumen')
+  async obtenerResumenMorosidad() {
+    return this.pagoMensualService.obtenerResumenMorosidad();
+  }
 }

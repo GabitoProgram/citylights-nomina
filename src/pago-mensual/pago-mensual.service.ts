@@ -161,6 +161,9 @@ export class PagoMensualService {
 
       // Crear fecha de vencimiento (último día del mes)
       const fechaVencimiento = new Date(anio, mes, 0, 23, 59, 59); // Último día del mes
+      
+      // Crear fecha de gracia (5 días del mes siguiente)
+      const fechaGracia = new Date(anio, mes, 5, 23, 59, 59);
 
       // Crear nueva cuota mensual
       const cuota = await this.prisma.cuotaMensualResidente.create({
@@ -170,8 +173,14 @@ export class PagoMensualService {
           userEmail,
           anio,
           mes,
-          monto: 100.0, // Cuota fija de $100
-          fechaVencimiento
+          monto: 100.0, // Cuota base de $100
+          montoMorosidad: 0.0,
+          montoTotal: 100.0,
+          estado: 'PENDIENTE',
+          fechaVencimiento,
+          fechaVencimientoGracia: fechaGracia,
+          diasMorosidad: 0,
+          porcentajeMorosidad: 10.0 // 10% de recargo por morosidad
         }
       });
 
@@ -342,6 +351,133 @@ export class PagoMensualService {
     } catch (error) {
       this.logger.error(`❌ Error confirmando pago: ${error.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * Verificar y aplicar morosidad a cuotas vencidas
+   */
+  async verificarYAplicarMorosidad() {
+    try {
+      const fechaActual = new Date();
+      console.log(`🔍 Verificando morosidad - Fecha actual: ${fechaActual.toLocaleDateString()}`);
+
+      // Buscar cuotas vencidas que no han sido pagadas
+      const cuotasVencidas = await this.prisma.cuotaMensualResidente.findMany({
+        where: {
+          estado: {
+            in: ['PENDIENTE', 'VENCIDO']
+          },
+          fechaVencimientoGracia: {
+            lt: fechaActual // Vencidas después del período de gracia
+          }
+        }
+      });
+
+      console.log(`📋 Encontradas ${cuotasVencidas.length} cuotas vencidas`);
+
+      const resultados = [];
+
+      for (const cuota of cuotasVencidas) {
+        try {
+          // Calcular días de morosidad
+          const diasMorosidad = Math.floor(
+            (fechaActual.getTime() - cuota.fechaVencimientoGracia.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          // Solo aplicar morosidad si hay días de retraso
+          if (diasMorosidad > 0) {
+            // Calcular recargo por morosidad
+            const montoMorosidad = (cuota.monto * cuota.porcentajeMorosidad) / 100;
+            const montoTotal = cuota.monto + montoMorosidad;
+
+            // Actualizar la cuota con la morosidad
+            const cuotaActualizada = await this.prisma.cuotaMensualResidente.update({
+              where: { id: cuota.id },
+              data: {
+                estado: 'MOROSO',
+                diasMorosidad: diasMorosidad,
+                montoMorosidad: montoMorosidad,
+                montoTotal: montoTotal
+              }
+            });
+
+            resultados.push({
+              userId: cuota.userId,
+              userName: cuota.userName,
+              mes: cuota.mes,
+              anio: cuota.anio,
+              diasMorosidad: diasMorosidad,
+              montoOriginal: cuota.monto,
+              montoMorosidad: montoMorosidad,
+              montoTotal: montoTotal,
+              porcentajeRecargo: cuota.porcentajeMorosidad,
+              estado: 'MOROSO'
+            });
+
+            console.log(`💰 Morosidad aplicada a ${cuota.userName}: +$${montoMorosidad.toFixed(2)} (${diasMorosidad} días de retraso)`);
+          }
+        } catch (error) {
+          console.error(`❌ Error aplicando morosidad a cuota ${cuota.id}:`, error.message);
+          resultados.push({
+            userId: cuota.userId,
+            userName: cuota.userName,
+            error: error.message
+          });
+        }
+      }
+
+      return {
+        mensaje: `Verificación de morosidad completada`,
+        cuotasVerificadas: cuotasVencidas.length,
+        morosidadAplicada: resultados.filter(r => !r.error).length,
+        errores: resultados.filter(r => r.error).length,
+        detalles: resultados
+      };
+
+    } catch (error) {
+      console.error('❌ Error verificando morosidad:', error);
+      throw new Error(`Error verificando morosidad: ${error.message}`);
+    }
+  }
+
+  /**
+   * Obtener resumen de cuotas con morosidad
+   */
+  async obtenerResumenMorosidad() {
+    try {
+      const cuotasMorosas = await this.prisma.cuotaMensualResidente.findMany({
+        where: {
+          estado: 'MOROSO'
+        },
+        orderBy: [
+          { anio: 'desc' },
+          { mes: 'desc' },
+          { diasMorosidad: 'desc' }
+        ]
+      });
+
+      const resumen = {
+        totalCuotasMorosas: cuotasMorosas.length,
+        montoTotalMorosidad: cuotasMorosas.reduce((sum, cuota) => sum + cuota.montoMorosidad, 0),
+        montoTotalAPagar: cuotasMorosas.reduce((sum, cuota) => sum + cuota.montoTotal, 0),
+        promedioeDiasMorosidad: cuotasMorosas.length > 0 
+          ? Math.round(cuotasMorosas.reduce((sum, cuota) => sum + cuota.diasMorosidad, 0) / cuotasMorosas.length)
+          : 0,
+        cuotasPorMes: cuotasMorosas.reduce((acc, cuota) => {
+          const clave = `${cuota.mes}/${cuota.anio}`;
+          if (!acc[clave]) acc[clave] = 0;
+          acc[clave]++;
+          return acc;
+        }, {}),
+        detallesCuotas: cuotasMorosas
+      };
+
+      return resumen;
+
+    } catch (error) {
+      console.error('❌ Error obteniendo resumen de morosidad:', error);
+      throw new Error(`Error obteniendo resumen de morosidad: ${error.message}`);
     }
   }
 
