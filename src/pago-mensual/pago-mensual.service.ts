@@ -1,5 +1,7 @@
 import { Injectable, Logger, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import Stripe from 'stripe';
 
 @Injectable()
@@ -7,7 +9,10 @@ export class PagoMensualService {
   private readonly logger = new Logger(PagoMensualService.name);
   private stripe: Stripe;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private httpService: HttpService
+  ) {
     // Inicializar Stripe
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     if (!stripeSecretKey) {
@@ -482,6 +487,119 @@ export class PagoMensualService {
   }
 
   /**
+   * Obtener estado de pago de todos los residentes USER_CASUAL para el mes actual
+   */
+  async obtenerEstadoPagoResidentesMesActual() {
+    try {
+      const fechaActual = new Date();
+      const anio = fechaActual.getFullYear();
+      const mes = fechaActual.getMonth() + 1;
+
+      console.log(`👥 Obteniendo estado de pago de residentes para ${mes}/${anio}`);
+
+      // Lista de residentes USER_CASUAL (simulados por ahora)
+      // En producción, esto debería obtenerse del microservicio de login
+      const residentes = [
+        { userId: 'user1', userName: 'Juan Pérez', userEmail: 'juan@example.com' },
+        { userId: 'user2', userName: 'María García', userEmail: 'maria@example.com' },
+        { userId: 'user3', userName: 'Carlos López', userEmail: 'carlos@example.com' },
+        { userId: 'user4', userName: 'Ana Martínez', userEmail: 'ana@example.com' },
+        { userId: 'user5', userName: 'Pedro Rodríguez', userEmail: 'pedro@example.com' }
+      ];
+
+      const resultados = [];
+
+      for (const residente of residentes) {
+        try {
+          // Buscar cuota del mes actual para este residente
+          const cuotaMesActual = await this.prisma.cuotaMensualResidente.findUnique({
+            where: {
+              userId_anio_mes: {
+                userId: residente.userId,
+                anio: anio,
+                mes: mes
+              }
+            }
+          });
+
+          if (cuotaMesActual) {
+            // Si existe la cuota, mostrar su estado
+            resultados.push({
+              userId: residente.userId,
+              userName: residente.userName,
+              userEmail: residente.userEmail,
+              tieneCuota: true,
+              estado: cuotaMesActual.estado,
+              monto: cuotaMesActual.monto,
+              montoMorosidad: cuotaMesActual.montoMorosidad,
+              montoTotal: cuotaMesActual.montoTotal,
+              fechaVencimiento: cuotaMesActual.fechaVencimiento,
+              fechaPago: cuotaMesActual.fechaPago,
+              diasMorosidad: cuotaMesActual.diasMorosidad,
+              cuotaId: cuotaMesActual.id
+            });
+          } else {
+            // Si no existe cuota, mostrar como pendiente de crear
+            resultados.push({
+              userId: residente.userId,
+              userName: residente.userName,
+              userEmail: residente.userEmail,
+              tieneCuota: false,
+              estado: 'SIN_CUOTA',
+              monto: 100.0,
+              montoMorosidad: 0,
+              montoTotal: 100.0,
+              fechaVencimiento: null,
+              fechaPago: null,
+              diasMorosidad: 0,
+              cuotaId: null
+            });
+          }
+        } catch (error) {
+          console.error(`❌ Error procesando residente ${residente.userName}:`, error.message);
+          resultados.push({
+            userId: residente.userId,
+            userName: residente.userName,
+            userEmail: residente.userEmail,
+            tieneCuota: false,
+            estado: 'ERROR',
+            error: error.message
+          });
+        }
+      }
+
+      // Estadísticas del mes
+      const estadisticas = {
+        totalResidentes: resultados.length,
+        conCuota: resultados.filter(r => r.tieneCuota).length,
+        sinCuota: resultados.filter(r => !r.tieneCuota && r.estado === 'SIN_CUOTA').length,
+        pagados: resultados.filter(r => r.estado === 'PAGADO').length,
+        pendientes: resultados.filter(r => r.estado === 'PENDIENTE').length,
+        vencidos: resultados.filter(r => r.estado === 'VENCIDO').length,
+        morosos: resultados.filter(r => r.estado === 'MOROSO').length,
+        montoTotalRecaudado: resultados
+          .filter(r => r.estado === 'PAGADO')
+          .reduce((sum, r) => sum + r.montoTotal, 0),
+        montoTotalPendiente: resultados
+          .filter(r => r.estado !== 'PAGADO' && r.estado !== 'ERROR')
+          .reduce((sum, r) => sum + r.montoTotal, 0)
+      };
+
+      return {
+        mes: mes,
+        anio: anio,
+        fechaConsulta: fechaActual,
+        estadisticas: estadisticas,
+        residentes: resultados
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo estado de pago de residentes:', error);
+      throw new Error(`Error obteniendo estado de pago: ${error.message}`);
+    }
+  }
+
+  /**
    * Generar cuotas mensuales automáticamente para todos los residentes activos
    */
   async generarCuotasMensualesAutomaticas(residentes: Array<{userId: string, userName: string, userEmail: string}>) {
@@ -515,5 +633,129 @@ export class PagoMensualService {
       errores: resultados.filter(r => !r.success).length,
       detalles: resultados
     };
+  }
+
+  /**
+   * 👥 RESIDENTES: Obtener usuarios USER_CASUAL desde el microservicio de login
+   */
+  async obtenerUsuariosCasual() {
+    try {
+      console.log('🔍 Consultando usuarios USER_CASUAL desde microservicio de login...');
+      
+      // Hacer llamada al microservicio de login a través del gateway usando HttpService
+      const response = await firstValueFrom(
+        this.httpService.get('https://citylights-gateway-production.up.railway.app/api/proxy/login/users?role=USER_CASUAL', {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        })
+      );
+
+      const usuarios = response.data;
+      console.log(`✅ Obtenidos ${usuarios.length} usuarios USER_CASUAL`);
+      
+      return usuarios;
+
+    } catch (error) {
+      console.error('❌ Error obteniendo usuarios USER_CASUAL:', error);
+      throw new Error(`Error conectando con microservicio de login: ${error.message}`);
+    }
+  }
+
+  /**
+   * 📊 RESIDENTES: Obtener resumen de pagos de todos los residentes del mes actual
+   */
+  async obtenerResumenPagosResidentes() {
+    try {
+      const fechaActual = new Date();
+      const anio = fechaActual.getFullYear();
+      const mes = fechaActual.getMonth() + 1;
+
+      console.log(`📊 Obteniendo resumen de pagos de residentes para ${mes}/${anio}`);
+
+      // 1. Obtener todos los usuarios USER_CASUAL del microservicio de login
+      const usuarios = await this.obtenerUsuariosCasual();
+
+      // 2. Para cada usuario, verificar si tiene cuota del mes actual
+      const resumenResidentes = [];
+
+      for (const usuario of usuarios) {
+        try {
+          // Buscar cuota del mes actual para este residente
+          const cuotaMesActual = await this.prisma.cuotaMensualResidente.findUnique({
+            where: {
+              userId_anio_mes: {
+                userId: usuario.id,
+                anio: anio,
+                mes: mes
+              }
+            }
+          });
+
+          const estadoPago = cuotaMesActual ? cuotaMesActual.estado : 'SIN_CUOTA';
+          
+          resumenResidentes.push({
+            usuario: {
+              id: usuario.id,
+              name: usuario.name,
+              email: usuario.email,
+              role: usuario.role
+            },
+            cuota: cuotaMesActual,
+            estadoPago: estadoPago,
+            montoAPagar: cuotaMesActual ? cuotaMesActual.montoTotal : 100.0,
+            tieneCuota: !!cuotaMesActual,
+            esMoroso: cuotaMesActual?.estado === 'MOROSO',
+            diasMorosidad: cuotaMesActual?.diasMorosidad || 0
+          });
+
+        } catch (error) {
+          console.error(`❌ Error procesando usuario ${usuario.id}:`, error.message);
+          resumenResidentes.push({
+            usuario: {
+              id: usuario.id,
+              name: usuario.name,
+              email: usuario.email,
+              role: usuario.role
+            },
+            cuota: null,
+            estadoPago: 'ERROR',
+            montoAPagar: 100.0,
+            tieneCuota: false,
+            esMoroso: false,
+            diasMorosidad: 0,
+            error: error.message
+          });
+        }
+      }
+
+      // 3. Calcular estadísticas generales
+      const estadisticas = {
+        totalResidentes: resumenResidentes.length,
+        conCuota: resumenResidentes.filter(r => r.tieneCuota).length,
+        sinCuota: resumenResidentes.filter(r => !r.tieneCuota && r.estadoPago !== 'ERROR').length,
+        pagados: resumenResidentes.filter(r => r.estadoPago === 'PAGADO').length,
+        pendientes: resumenResidentes.filter(r => r.estadoPago === 'PENDIENTE').length,
+        vencidos: resumenResidentes.filter(r => r.estadoPago === 'VENCIDO').length,
+        morosos: resumenResidentes.filter(r => r.estadoPago === 'MOROSO').length,
+        montoRecaudado: resumenResidentes
+          .filter(r => r.estadoPago === 'PAGADO')
+          .reduce((sum, r) => sum + r.montoAPagar, 0),
+        montoPendiente: resumenResidentes
+          .filter(r => r.estadoPago !== 'PAGADO' && r.estadoPago !== 'ERROR')
+          .reduce((sum, r) => sum + r.montoAPagar, 0)
+      };
+
+      return {
+        mes: mes,
+        anio: anio,
+        estadisticas: estadisticas,
+        residentes: resumenResidentes
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo resumen de pagos de residentes:', error);
+      throw new Error(`Error obteniendo resumen de pagos: ${error.message}`);
+    }
   }
 }

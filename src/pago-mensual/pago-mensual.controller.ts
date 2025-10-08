@@ -172,4 +172,28 @@ export class PagoMensualController {
   async obtenerResumenMorosidad() {
     return this.pagoMensualService.obtenerResumenMorosidad();
   }
+
+  /**
+   * 👥 RESIDENTES: Obtener todos los residentes USER_CASUAL con estado de pago del mes actual
+   */
+  @Get('residentes/estado-mes-actual')
+  async obtenerEstadoPagoResidentesMesActual() {
+    return this.pagoMensualService.obtenerEstadoPagoResidentesMesActual();
+  }
+
+  /**
+   * 👥 RESIDENTES: Obtener todos los usuarios USER_CASUAL del microservicio de login
+   */
+  @Get('residentes/usuarios')
+  async obtenerUsuariosCasual() {
+    return this.pagoMensualService.obtenerUsuariosCasual();
+  }
+
+  /**
+   * 📊 RESIDENTES: Resumen completo de pagos de todos los residentes del mes actual
+   */
+  @Get('residentes/resumen-pagos')
+  async obtenerResumenPagosResidentes() {
+    return this.pagoMensualService.obtenerResumenPagosResidentes();
+  }
 }
