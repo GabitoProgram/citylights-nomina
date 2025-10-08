@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, forwardRef, Inject, ConflictException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
 import { FacturaNominaService } from '../factura/factura-nomina.service';
+import { PagoMensualService } from '../pago-mensual/pago-mensual.service';
 
 @Injectable()
 export class PagoService {
@@ -10,7 +11,9 @@ export class PagoService {
 
   constructor(
     private prisma: PrismaService,
-    private facturaNominaService: FacturaNominaService
+    private facturaNominaService: FacturaNominaService,
+    @Inject(forwardRef(() => PagoMensualService))
+    private pagoMensualService: PagoMensualService
   ) {
     // Verificar que la clave de Stripe esté configurada
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -50,6 +53,20 @@ export class PagoService {
       if (!trabajador || !nomina) {
         throw new Error('Trabajador o nómina no encontrados');
       }
+
+      // 🛡️ NUEVA VALIDACIÓN: Verificar si el empleado ya fue pagado este mes
+      this.logger.log(`🔍 Verificando si el empleado ya fue pagado este mes...`);
+      const verificacionMensual = await this.pagoMensualService.verificarPagoMensualEmpleado(trabajadorId);
+      
+      if (verificacionMensual.yaPagado) {
+        const fechaPago = verificacionMensual.pagoExistente.fechaPago.toLocaleDateString('es-ES');
+        throw new ConflictException(
+          `❌ El empleado ${trabajador.nombre} ya recibió su pago mensual para ${verificacionMensual.mes}/${verificacionMensual.anio}. ` +
+          `Último pago realizado el ${fechaPago}. Solo se permite un pago por empleado por mes.`
+        );
+      }
+
+      this.logger.log(`✅ Empleado ${trabajador.nombre} puede recibir pago mensual para ${verificacionMensual.mes}/${verificacionMensual.anio}`);
 
       // Crear registro de pago usando el esquema actual
       this.logger.log(`💾 Creando registro de pago en base de datos...`);
@@ -151,6 +168,19 @@ export class PagoService {
       });
 
       this.logger.log(`✅ Pago ${pagoId} confirmado exitosamente`);
+
+      // 🆕 CREAR REGISTRO DE PAGO MENSUAL
+      try {
+        const pagoMensual = await this.pagoMensualService.crearPagoMensualEmpleado(
+          pagoActualizado.nomina.trabajadorId,
+          pagoActualizado.monto,
+          { userId: pagoActualizado.is_user }
+        );
+        this.logger.log(`✅ Registro de pago mensual creado: ${pagoMensual.pagoMensual.id}`);
+      } catch (pagoMensualError) {
+        this.logger.error(`⚠️ Error creando registro de pago mensual: ${pagoMensualError.message}`);
+        // No fallar la confirmación del pago por este error, solo registrar
+      }
 
       // 🆕 GENERAR FACTURA AUTOMÁTICAMENTE
       try {

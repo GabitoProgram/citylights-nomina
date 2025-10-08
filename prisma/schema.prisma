@@ -19,6 +19,7 @@ model Trabajador {
   fechaContrato    DateTime @default(now())
   estado           String   @default("ACTIVO") // ACTIVO, INACTIVO
   nominas          Nomina[]
+  pagosMensuales   PagoMensualEmpleado[]
 }
 
 model Nomina {
@@ -43,4 +44,41 @@ model Pagar {
   referencia  String?  // Número de referencia del pago
   fecha       DateTime @default(now())
   fechaPago   DateTime?
+}
+
+// Nueva tabla para controlar pagos mensuales de empleados
+model PagoMensualEmpleado {
+  id           Int      @id @default(autoincrement())
+  trabajadorId Int
+  trabajador   Trabajador @relation(fields: [trabajadorId], references: [id])
+  anio         Int      // Año del pago
+  mes          Int      // Mes del pago (1-12)
+  monto        Float    // Monto total pagado en el mes
+  estado       String   @default("COMPLETADO") // COMPLETADO, PENDIENTE, FALLIDO
+  fechaPago    DateTime @default(now())
+  referencia   String?  // Número de referencia del pago
+  is_user      String   // Usuario que realizó el pago
+  
+  @@unique([trabajadorId, anio, mes]) // Solo un pago por empleado por mes
+}
+
+// Nueva tabla para cuotas mensuales de residentes
+model CuotaMensualResidente {
+  id          Int      @id @default(autoincrement())
+  userId      String   // ID del usuario residente (USER_CASUAL)
+  userName    String   // Nombre del residente
+  userEmail   String   // Email del residente
+  anio        Int      // Año de la cuota
+  mes         Int      // Mes de la cuota (1-12)
+  monto       Float    @default(100.0) // Cuota fija de $100
+  estado      String   @default("PENDIENTE") // PENDIENTE, PAGADO, VENCIDO
+  fechaVencimiento DateTime // Fecha límite de pago
+  fechaPago   DateTime? // Fecha en que se realizó el pago
+  metodoPago  String?  // Método usado para el pago
+  referencia  String?  // Número de referencia del pago
+  stripeSessionId String? // ID de la sesión de Stripe
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, anio, mes]) // Solo una cuota por residente por mes
 }
