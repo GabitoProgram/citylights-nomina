@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TrabajadorModule } from './trabajador/trabajador.module';
 import { NominaModule } from './nomina/nomina.module';
 import { PagarModule } from './pagar/pagar.module';
@@ -11,15 +12,24 @@ import { PdfService } from './pdf/pdf.service';
 import { FacturaNominaController } from './factura/factura-nomina.controller';
 import { FacturaNominaService } from './factura/factura-nomina.service';
 import { PrismaService } from './prisma/prisma.service';
+import { TasksService } from './tasks/tasks.service';
 
 @Module({
-  imports: [TrabajadorModule, NominaModule, PagarModule, ReportesModule, PagoMensualModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    TrabajadorModule, 
+    NominaModule, 
+    PagarModule, 
+    ReportesModule, 
+    PagoMensualModule
+  ],
   controllers: [PagoController, PdfController, FacturaNominaController],
   providers: [
     PagoService, 
     PdfService, 
     FacturaNominaService, 
-    PrismaService
+    PrismaService,
+    TasksService
   ],
 })
 export class AppModule {}

@@ -56,6 +56,22 @@ export class PagoMensualController {
   }
 
   /**
+   * 🤖 AUTOMATICO: Generar cuotas mensuales para todos los residentes
+   */
+  @Post('generar-cuotas-automaticas')
+  async generarCuotasAutomaticas() {
+    return this.pagoMensualService.generarCuotasMensualesAutomaticas();
+  }
+
+  /**
+   * 👤 RESIDENTE: Obtener cuotas de un residente específico
+   */
+  @Get('residente/:userId/cuotas')
+  async obtenerCuotasResidente(@Param('userId') userId: string) {
+    return this.pagoMensualService.obtenerCuotasResidente(userId);
+  }
+
+  /**
    * 🏠 RESIDENTES: Crear sesión de pago para cuota mensual
    */
   @Post('residente/cuota')
@@ -108,19 +124,7 @@ export class PagoMensualController {
   }
 
   /**
-   * 🔄 AUTOMÁTICO: Generar cuotas mensuales para todos los residentes
-   */
-  @Post('residentes/generar-cuotas')
-  async generarCuotasAutomaticas(
-    @Body() body: { 
-      residentes: Array<{userId: string, userName: string, userEmail: string}> 
-    }
-  ) {
-    return this.pagoMensualService.generarCuotasMensualesAutomaticas(body.residentes);
-  }
-
-  /**
-   * 📈 ESTADÍSTICAS: Resumen del mes actual
+   *  ESTADÍSTICAS: Resumen del mes actual
    */
   @Get('estadisticas/mes-actual')
   async obtenerEstadisticasMesActual() {

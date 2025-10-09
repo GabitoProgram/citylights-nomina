@@ -293,8 +293,115 @@ export class PagoMensualService {
   }
 
   /**
-   * Obtener historial de pagos mensuales de empleados
+   * 🤖 AUTOMATICO: Generar cuotas mensuales para todos los residentes USER_CASUAL
    */
+  async generarCuotasMensualesAutomaticas() {
+    try {
+      const fecha = new Date();
+      const anio = fecha.getFullYear();
+      const mes = fecha.getMonth() + 1;
+
+      this.logger.log(`🤖 Generando cuotas automáticas para ${mes}/${anio}`);
+
+      // Obtener todos los usuarios USER_CASUAL del microservicio de login
+      const response = await firstValueFrom(
+        this.httpService.get(`${process.env.LOGIN_SERVICE_URL || 'https://citylights-login-production.up.railway.app'}/users/list?role=USER_CASUAL&page=1&limit=100`)
+      );
+
+      const usuarios = response.data?.data?.users || [];
+      this.logger.log(`👥 Encontrados ${usuarios.length} residentes USER_CASUAL`);
+
+      let cuotasCreadas = 0;
+      let cuotasExistentes = 0;
+
+      for (const usuario of usuarios) {
+        try {
+          // Verificar si ya existe cuota para este mes
+          const verificacion = await this.verificarCuotaMensualResidente(usuario.id.toString(), anio, mes);
+          
+          if (!verificacion.existe) {
+            // Crear cuota automáticamente
+            await this.crearCuotaMensualResidente(usuario.id.toString(), `${usuario.firstName} ${usuario.lastName}`, usuario.email);
+            cuotasCreadas++;
+            this.logger.log(`✅ Cuota creada para ${usuario.firstName} ${usuario.lastName}`);
+          } else {
+            cuotasExistentes++;
+            this.logger.log(`ℹ️ Cuota ya existe para ${usuario.firstName} ${usuario.lastName}`);
+          }
+        } catch (error) {
+          this.logger.error(`❌ Error creando cuota para ${usuario.firstName} ${usuario.lastName}: ${error.message}`);
+        }
+      }
+
+      const resultado = {
+        anio,
+        mes,
+        totalUsuarios: usuarios.length,
+        cuotasCreadas,
+        cuotasExistentes,
+        mensaje: `Proceso completado: ${cuotasCreadas} cuotas creadas, ${cuotasExistentes} ya existían`
+      };
+
+      this.logger.log(`🎯 Resultado: ${JSON.stringify(resultado)}`);
+      return resultado;
+
+    } catch (error) {
+      this.logger.error(`❌ Error generando cuotas automáticas: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 👤 RESIDENTE: Obtener cuotas pendientes de un residente específico
+   */
+  async obtenerCuotasResidente(userId: string) {
+    try {
+      this.logger.log(`👤 Obteniendo cuotas para residente ${userId}`);
+
+      const cuotas = await this.prisma.cuotaMensualResidente.findMany({
+        where: { userId },
+        orderBy: [
+          { anio: 'desc' },
+          { mes: 'desc' }
+        ]
+      });
+
+      // Verificar y aplicar morosidad a las cuotas pendientes
+      for (const cuota of cuotas) {
+        if (cuota.estado === 'PENDIENTE') {
+          await this.verificarYAplicarMorosidad();
+        }
+      }
+
+      // Obtener las cuotas actualizadas
+      const cuotasActualizadas = await this.prisma.cuotaMensualResidente.findMany({
+        where: { userId },
+        orderBy: [
+          { anio: 'desc' },
+          { mes: 'desc' }
+        ]
+      });
+
+      const estadisticas = {
+        total: cuotasActualizadas.length,
+        pendientes: cuotasActualizadas.filter(c => c.estado === 'PENDIENTE').length,
+        pagadas: cuotasActualizadas.filter(c => c.estado === 'PAGADO').length,
+        morosas: cuotasActualizadas.filter(c => c.estado === 'MOROSO').length,
+        montoTotalPendiente: cuotasActualizadas
+          .filter(c => c.estado === 'PENDIENTE' || c.estado === 'MOROSO')
+          .reduce((total, c) => total + c.montoTotal, 0)
+      };
+
+      return {
+        cuotas: cuotasActualizadas,
+        estadisticas
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Error obteniendo cuotas del residente: ${error.message}`);
+      throw error;
+    }
+  }
   async obtenerHistorialPagosEmpleados(anio?: number, mes?: number) {
     const where: any = {};
     
@@ -617,42 +724,6 @@ export class PagoMensualService {
       console.error('❌ Error obteniendo estado de pago de residentes:', error);
       throw new Error(`Error obteniendo estado de pago: ${error.message}`);
     }
-  }
-
-  /**
-   * Generar cuotas mensuales automáticamente para todos los residentes activos
-   */
-  async generarCuotasMensualesAutomaticas(residentes: Array<{userId: string, userName: string, userEmail: string}>) {
-    const resultados = [];
-    
-    for (const residente of residentes) {
-      try {
-        const resultado = await this.crearCuotaMensualResidente(
-          residente.userId, 
-          residente.userName, 
-          residente.userEmail
-        );
-        resultados.push({
-          userId: residente.userId,
-          success: true,
-          cuota: resultado.cuota,
-          yaExistia: resultado.cuotaExistente
-        });
-      } catch (error) {
-        resultados.push({
-          userId: residente.userId,
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    return {
-      totalProcesados: residentes.length,
-      exitosos: resultados.filter(r => r.success).length,
-      errores: resultados.filter(r => !r.success).length,
-      detalles: resultados
-    };
   }
 
   /**
