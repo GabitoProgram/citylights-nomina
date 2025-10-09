@@ -323,4 +323,146 @@ export class FacturaNominaService {
       throw error;
     }
   }
+
+  /**
+   * Generar PDF de factura para cuota de residente
+   */
+  async generarPDFCuotaResidente(datos: {
+    numeroFactura: string;
+    clienteNombre: string;
+    clienteEmail: string;
+    total: number;
+    concepto: string;
+    periodo: string;
+    cuotaId: number;
+    detalles?: Array<{
+      descripcion: string;
+      cantidad: number;
+      precio: number;
+      total: number;
+    }>;
+  }): Promise<Buffer> {
+    try {
+      this.logger.log(`🔄 Generando PDF para cuota ${datos.cuotaId}: ${datos.numeroFactura}`);
+
+      return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({
+          size: 'A4',
+          margin: 50,
+          bufferPages: true
+        });
+
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => {
+          const pdfBuffer = Buffer.concat(buffers);
+          resolve(pdfBuffer);
+        });
+        doc.on('error', reject);
+
+        // ENCABEZADO
+        doc.fontSize(20)
+           .fillColor('#2563eb')
+           .text('CITYLIGHTS - FACTURA DE CUOTA', 50, 50);
+
+        doc.fontSize(12)
+           .fillColor('#000000')
+           .text(`Número de Factura: ${datos.numeroFactura}`, 50, 90)
+           .text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, 50, 110)
+           .text(`Período: ${datos.periodo}`, 50, 130);
+
+        // LÍNEA SEPARADORA
+        doc.moveTo(50, 160)
+           .lineTo(545, 160)
+           .stroke();
+
+        // DATOS DEL CLIENTE
+        doc.fontSize(14)
+           .fillColor('#1f2937')
+           .text('DATOS DEL RESIDENTE', 50, 180);
+
+        doc.fontSize(12)
+           .fillColor('#000000')
+           .text(`Nombre: ${datos.clienteNombre}`, 50, 210)
+           .text(`Email: ${datos.clienteEmail}`, 50, 230)
+           .text(`Concepto: ${datos.concepto}`, 50, 250);
+
+        // DETALLES DE LA FACTURA
+        let yPosition = 290;
+        doc.fontSize(14)
+           .fillColor('#1f2937')
+           .text('DETALLE DE LA FACTURA', 50, yPosition);
+
+        yPosition += 30;
+
+        // Encabezados de tabla
+        doc.fontSize(10)
+           .fillColor('#6b7280')
+           .text('DESCRIPCIÓN', 50, yPosition)
+           .text('CANT.', 350, yPosition)
+           .text('PRECIO', 400, yPosition)
+           .text('TOTAL', 480, yPosition);
+
+        yPosition += 20;
+
+        // Línea bajo encabezados
+        doc.moveTo(50, yPosition)
+           .lineTo(545, yPosition)
+           .stroke();
+
+        yPosition += 15;
+
+        // Detalles o datos por defecto
+        const detallesFactura = datos.detalles || [
+          {
+            descripcion: datos.concepto,
+            cantidad: 1,
+            precio: datos.total,
+            total: datos.total
+          }
+        ];
+
+        doc.fontSize(10)
+           .fillColor('#000000');
+
+        detallesFactura.forEach((detalle) => {
+          doc.text(detalle.descripcion, 50, yPosition)
+             .text(detalle.cantidad.toString(), 350, yPosition)
+             .text(`$${detalle.precio.toFixed(2)}`, 400, yPosition)
+             .text(`$${detalle.total.toFixed(2)}`, 480, yPosition);
+          
+          yPosition += 20;
+        });
+
+        // Línea antes del total
+        yPosition += 10;
+        doc.moveTo(350, yPosition)
+           .lineTo(545, yPosition)
+           .stroke();
+
+        // TOTAL
+        yPosition += 20;
+        doc.fontSize(14)
+           .fillColor('#1f2937')
+           .text('TOTAL A PAGAR:', 350, yPosition)
+           .fontSize(16)
+           .fillColor('#dc2626')
+           .text(`$${datos.total.toFixed(2)}`, 480, yPosition);
+
+        // PIE DE PÁGINA
+        const footerY = 720;
+        doc.fontSize(8)
+           .fillColor('#6b7280')
+           .text('CitiLights - Sistema de Gestión de Cuotas Residenciales', 50, footerY)
+           .text(`Factura generada el ${new Date().toLocaleString('es-ES')}`, 50, footerY + 12)
+           .text('Esta es una factura digital generada automáticamente.', 50, footerY + 24);
+
+        doc.end();
+      });
+
+    } catch (error) {
+      this.logger.error(`❌ Error generando PDF para cuota: ${error.message}`);
+      throw error;
+    }
+  }
 }

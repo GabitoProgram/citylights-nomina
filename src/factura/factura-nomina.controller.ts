@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res } from '@nestjs/common';
+import { Controller, Get, Param, Res, Post, Body } from '@nestjs/common';
 import { Response } from 'express';
 import { FacturaNominaService } from './factura-nomina.service';
 import * as fs from 'fs';
@@ -10,6 +10,41 @@ export class FacturaNominaController {
   @Get('generar/:pagoId')
   async generarFactura(@Param('pagoId') pagoId: string) {
     return this.facturaNominaService.generarFacturaAutomatica(+pagoId);
+  }
+
+  // 🆕 ENDPOINT PARA GENERAR PDF DE CUOTAS DE RESIDENTES
+  @Post('cuota/generar-pdf')
+  async generarPDFCuotaResidente(
+    @Body() datos: {
+      numeroFactura: string;
+      clienteNombre: string;
+      clienteEmail: string;
+      total: number;
+      concepto: string;
+      periodo: string;
+      cuotaId: number;
+      detalles?: Array<{
+        descripcion: string;
+        cantidad: number;
+        precio: number;
+        total: number;
+      }>;
+    },
+    @Res() res: Response
+  ) {
+    try {
+      const pdfBuffer = await this.facturaNominaService.generarPDFCuotaResidente(datos);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="factura_cuota_${datos.numeroFactura}.pdf"`);
+      res.send(pdfBuffer);
+      
+    } catch (error) {
+      res.status(500).json({ 
+        success: false,
+        error: error.message 
+      });
+    }
   }
 
   @Get('pdf/:pagoId')
