@@ -250,8 +250,8 @@ export class PagoMensualService {
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/cuotas?success=true&cuota_id=${cuota.id}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/cuotas?canceled=true&cuota_id=${cuota.id}`,
+        success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/mis-pagos?success=true&cuota_id=${cuota.id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/mis-pagos?canceled=true&cuota_id=${cuota.id}`,
         metadata: {
           cuota_id: cuota.id.toString(),
           user_id: userId,

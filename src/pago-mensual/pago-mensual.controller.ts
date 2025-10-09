@@ -94,6 +94,18 @@ export class PagoMensualController {
   }
 
   /**
+   * 💳 RESIDENTES: Confirmar pago de cuota mensual desde Stripe
+   */
+  @Post('confirmar-pago-cuota')
+  async confirmarPagoCuotaManual(
+    @Body() body: { cuotaId: number; sessionId: string }
+  ) {
+    return this.pagoMensualService.confirmarPagoCuotaResidente(
+      body.sessionId
+    );
+  }
+
+  /**
    * Confirmar pago de cuota mensual (webhook)
    */
   @Post('residente/confirmar/:sessionId')
