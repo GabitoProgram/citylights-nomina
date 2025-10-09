@@ -304,8 +304,13 @@ export class PagoMensualService {
       this.logger.log(`🤖 Generando cuotas automáticas para ${mes}/${anio}`);
 
       // Obtener todos los usuarios USER_CASUAL del microservicio de login
+      const loginServiceUrl = 'https://citylights-login-production.up.railway.app';
+      const endpoint = `${loginServiceUrl}/users/list?role=USER_CASUAL&page=1&limit=100`;
+      
+      this.logger.log(`🔗 Consultando usuarios en: ${endpoint}`);
+      
       const response = await firstValueFrom(
-        this.httpService.get(`${process.env.LOGIN_SERVICE_URL || 'https://citylights-login-production.up.railway.app'}/users/list?role=USER_CASUAL&page=1&limit=100`)
+        this.httpService.get(endpoint)
       );
 
       const usuarios = response.data?.data?.users || [];
@@ -347,7 +352,13 @@ export class PagoMensualService {
 
     } catch (error) {
       this.logger.error(`❌ Error generando cuotas automáticas: ${error.message}`);
-      throw error;
+      this.logger.error(`❌ Stack trace: ${error.stack}`);
+      
+      if (error.response) {
+        this.logger.error(`❌ Error de respuesta HTTP: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+      }
+      
+      throw new Error(`Error al generar cuotas automáticas: ${error.message}`);
     }
   }
 
