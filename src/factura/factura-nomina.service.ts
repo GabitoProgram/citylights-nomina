@@ -344,6 +344,7 @@ export class FacturaNominaService {
   }): Promise<Buffer> {
     try {
       this.logger.log(`🔄 Generando PDF para cuota ${datos.cuotaId}: ${datos.numeroFactura}`);
+      this.logger.log(`📝 Datos recibidos: ${JSON.stringify(datos)}`);
 
       return new Promise((resolve, reject) => {
         const doc = new PDFDocument({

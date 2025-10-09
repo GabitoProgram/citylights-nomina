@@ -40,9 +40,12 @@ export class FacturaNominaController {
       res.send(pdfBuffer);
       
     } catch (error) {
+      console.error('❌ Error en endpoint generar-pdf:', error);
+      console.error('❌ Stack trace:', error.stack);
       res.status(500).json({ 
         success: false,
-        error: error.message 
+        error: error.message,
+        details: error.stack
       });
     }
   }
