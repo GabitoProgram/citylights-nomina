@@ -1,22 +1,4 @@
-import { Controller, Post, Get, Body, Headers, Query, Param } fro  /**
-   * 🔄 MANUAL: Generar cuotas para el mes actual (para testing)
-   */
-  @Post('generar-cuotas-mes-actual')
-  async generarCuotasMesActual() {
-    return this.pagoMensualService.generarCuotasMensualesAutomaticas();
-  }
-
-  /**
-   * 📊 ESTADISTICAS: Obtener estadísticas generales del sistema
-   */
-  @Get('estadisticas/resumen-general')
-  async obtenerEstadisticasGenerales() {
-    return this.pagoMensualService.obtenerEstadisticasGenerales();
-  }
-
-  /**
-   * 👤 RESIDENTE: Obtener cuotas de un residente específico
-   */common';
+import { Controller, Post, Get, Body, Headers, Query, Param } from '@nestjs/common';
 import { PagoMensualService } from './pago-mensual.service';
 
 @Controller('pago-mensual')
