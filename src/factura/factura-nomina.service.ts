@@ -287,4 +287,40 @@ export class FacturaNominaService {
       return null;
     }
   }
+
+  /**
+   * Generar factura para cuota de residente
+   */
+  async generarFacturaCuotaResidente(datos: {
+    trabajadorNombre: string;
+    trabajadorEmail: string;
+    total: number;
+    concepto: string;
+    tipo: string;
+    periodo: string;
+    cuotaId: number;
+  }) {
+    try {
+      // Crear número de factura único
+      const numeroFactura = `CUOTA-${datos.cuotaId.toString().padStart(8, '0')}`;
+      
+      this.logger.log(`✅ Datos de factura preparados para cuota ${datos.cuotaId}: ${numeroFactura}`);
+
+      // Retornar datos de la factura para el sistema de booking
+      return {
+        numeroFactura,
+        trabajadorNombre: datos.trabajadorNombre,
+        total: datos.total,
+        estado: 'GENERADA',
+        fechaCreacion: new Date().toISOString(),
+        concepto: datos.concepto,
+        periodo: datos.periodo,
+        tipo: datos.tipo
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Error preparando datos de factura para cuota: ${error.message}`);
+      throw error;
+    }
+  }
 }

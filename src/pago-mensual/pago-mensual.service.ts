@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import Stripe from 'stripe';
+import { FacturaNominaService } from '../factura/factura-nomina.service';
 
 @Injectable()
 export class PagoMensualService {
@@ -11,7 +12,8 @@ export class PagoMensualService {
 
   constructor(
     private prisma: PrismaService,
-    private httpService: HttpService
+    private httpService: HttpService,
+    private facturaNominaService: FacturaNominaService
   ) {
     // Inicializar Stripe
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -293,7 +295,60 @@ export class PagoMensualService {
   }
 
   /**
-   * 🤖 AUTOMATICO: Generar cuotas mensuales para todos los residentes USER_CASUAL
+   * 🤖 AUTOMATICO: Generar cuotas mensuales para residentes específicos
+   */
+  async generarCuotasConListaUsuarios(usuarios: any[]) {
+    try {
+      const fecha = new Date();
+      const anio = fecha.getFullYear();
+      const mes = fecha.getMonth() + 1;
+
+      this.logger.log(`🤖 Generando cuotas para ${usuarios.length} usuarios en ${mes}/${anio}`);
+
+      let cuotasCreadas = 0;
+      let cuotasExistentes = 0;
+
+      for (const usuario of usuarios) {
+        try {
+          // Verificar si ya existe cuota para este mes
+          const verificacion = await this.verificarCuotaMensualResidente(usuario.id.toString(), anio, mes);
+          
+          if (!verificacion.existe) {
+            // Crear cuota automáticamente
+            await this.crearCuotaMensualResidente(usuario.id.toString(), `${usuario.firstName} ${usuario.lastName}`, usuario.email);
+            cuotasCreadas++;
+            this.logger.log(`✅ Cuota creada para ${usuario.firstName} ${usuario.lastName}`);
+          } else {
+            cuotasExistentes++;
+            this.logger.log(`ℹ️ Cuota ya existe para ${usuario.firstName} ${usuario.lastName}`);
+          }
+        } catch (error) {
+          this.logger.error(`❌ Error creando cuota para ${usuario.firstName} ${usuario.lastName}: ${error.message}`);
+        }
+      }
+
+      const resultado = {
+        anio,
+        mes,
+        totalUsuarios: usuarios.length,
+        cuotasCreadas,
+        cuotasExistentes,
+        mensaje: `Proceso completado: ${cuotasCreadas} cuotas creadas, ${cuotasExistentes} ya existían`
+      };
+
+      this.logger.log(`🎯 Resultado: ${JSON.stringify(resultado)}`);
+      return resultado;
+
+    } catch (error) {
+      this.logger.error(`❌ Error generando cuotas con lista de usuarios: ${error.message}`);
+      this.logger.error(`❌ Stack trace: ${error.stack}`);
+      
+      throw new Error(`Error al generar cuotas: ${error.message}`);
+    }
+  }
+
+  /**
+   * 🤖 AUTOMATICO: Generar cuotas mensuales para todos los residentes USER_CASUAL (método original)
    */
   async generarCuotasMensualesAutomaticas() {
     try {
@@ -485,9 +540,31 @@ export class PagoMensualService {
 
       this.logger.log(`✅ Cuota ${cuota.id} marcada como pagada exitosamente`);
 
+      // 🆕 GENERAR FACTURA AUTOMÁTICAMENTE PARA LA CUOTA
+      let factura = null;
+      try {
+        // Crear datos específicos para la factura de cuota
+        const datosFactura = {
+          trabajadorNombre: cuotaActualizada.userName || 'Residente',
+          trabajadorEmail: cuotaActualizada.userEmail || '',
+          total: cuotaActualizada.montoTotal || cuotaActualizada.monto,
+          concepto: `Cuota mensual ${cuotaActualizada.mes}/${cuotaActualizada.anio}`,
+          tipo: 'CUOTA_RESIDENTE',
+          periodo: `${cuotaActualizada.mes}/${cuotaActualizada.anio}`,
+          cuotaId: cuotaActualizada.id
+        };
+
+        factura = await this.facturaNominaService.generarFacturaCuotaResidente(datosFactura);
+        this.logger.log(`✅ Factura ${factura.numeroFactura} generada automáticamente para cuota ${cuotaActualizada.id}`);
+      } catch (facturaError) {
+        this.logger.error(`❌ Error generando factura para cuota ${cuotaActualizada.id}: ${facturaError.message}`);
+        // No fallar la confirmación del pago por error en factura
+      }
+
       return {
         success: true,
         cuota: cuotaActualizada,
+        factura: factura,
         yaEstabaPageada: false
       };
 
