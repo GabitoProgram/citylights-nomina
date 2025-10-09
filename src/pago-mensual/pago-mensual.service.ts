@@ -727,7 +727,66 @@ export class PagoMensualService {
   }
 
   /**
-   * 👥 RESIDENTES: Obtener usuarios USER_CASUAL desde el microservicio de login
+   * � ESTADISTICAS: Obtener estadísticas generales del sistema
+   */
+  async obtenerEstadisticasGenerales() {
+    try {
+      const fechaActual = new Date();
+      const anio = fechaActual.getFullYear();
+      const mes = fechaActual.getMonth() + 1;
+
+      this.logger.log(`📊 Generando estadísticas generales para ${mes}/${anio}`);
+
+      // Obtener todas las cuotas del mes actual
+      const cuotasMesActual = await this.prisma.cuotaMensualResidente.findMany({
+        where: { anio, mes }
+      });
+
+      // Obtener total de usuarios USER_CASUAL
+      const response = await firstValueFrom(
+        this.httpService.get(`${process.env.LOGIN_SERVICE_URL || 'https://citylights-login-production.up.railway.app'}/users/list?role=USER_CASUAL&page=1&limit=100`)
+      );
+      const totalResidentes = response.data?.data?.total || 0;
+
+      // Calcular estadísticas
+      const estadisticas = {
+        mesActual: {
+          anio,
+          mes,
+          totalResidentes,
+          cuotasGeneradas: cuotasMesActual.length,
+          cuotasPendientes: cuotasMesActual.filter(c => c.estado === 'PENDIENTE').length,
+          cuotasPagadas: cuotasMesActual.filter(c => c.estado === 'PAGADO').length,
+          cuotasMorosas: cuotasMesActual.filter(c => c.estado === 'MOROSO').length,
+          montoTotalGenerado: cuotasMesActual.reduce((total, c) => total + c.montoTotal, 0),
+          montoTotalRecaudado: cuotasMesActual
+            .filter(c => c.estado === 'PAGADO')
+            .reduce((total, c) => total + c.montoTotal, 0),
+          montoTotalPendiente: cuotasMesActual
+            .filter(c => c.estado === 'PENDIENTE' || c.estado === 'MOROSO')
+            .reduce((total, c) => total + c.montoTotal, 0)
+        },
+        cobertura: {
+          porcentajeGeneracion: totalResidentes > 0 ? (cuotasMesActual.length / totalResidentes) * 100 : 0,
+          porcentajePago: cuotasMesActual.length > 0 ? (cuotasMesActual.filter(c => c.estado === 'PAGADO').length / cuotasMesActual.length) * 100 : 0,
+          porcentajeMorosidad: cuotasMesActual.length > 0 ? (cuotasMesActual.filter(c => c.estado === 'MOROSO').length / cuotasMesActual.length) * 100 : 0
+        }
+      };
+
+      return {
+        success: true,
+        estadisticas,
+        ultimaActualizacion: new Date().toISOString()
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Error obteniendo estadísticas generales: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * �👥 RESIDENTES: Obtener usuarios USER_CASUAL desde el microservicio de login
    */
   async obtenerUsuariosCasual() {
     try {
