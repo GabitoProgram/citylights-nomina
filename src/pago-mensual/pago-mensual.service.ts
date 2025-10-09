@@ -217,6 +217,24 @@ export class PagoMensualService {
         throw new ConflictException('La cuota mensual ya fue pagada');
       }
 
+      // Verificar si Stripe está configurado
+      if (!this.stripe) {
+        this.logger.warn('⚠️ Stripe no configurado, retornando solo la cuota');
+        return {
+          success: true,
+          message: 'Cuota creada exitosamente (sin integración de pago)',
+          cuota: {
+            id: cuota.id,
+            monto: cuota.monto,
+            montoTotal: cuota.montoTotal,
+            mes: cuota.mes,
+            anio: cuota.anio,
+            fechaVencimiento: cuota.fechaVencimiento,
+            estado: cuota.estado
+          }
+        };
+      }
+
       // Crear sesión de Stripe
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
@@ -260,6 +278,7 @@ export class PagoMensualService {
         cuota: {
           id: cuota.id,
           monto: cuota.monto,
+          montoTotal: cuota.montoTotal,
           mes: cuota.mes,
           anio: cuota.anio,
           fechaVencimiento: cuota.fechaVencimiento
@@ -268,6 +287,7 @@ export class PagoMensualService {
 
     } catch (error) {
       this.logger.error(`❌ Error creando sesión de pago: ${error.message}`);
+      this.logger.error(`📋 Stack trace: ${error.stack}`);
       throw error;
     }
   }
