@@ -80,6 +80,20 @@ export class PagoMensualController {
   }
 
   /**
+   * 🏠 RESIDENTES: Crear cuota mensual (solo crear, sin pago)
+   */
+  @Post('residente/crear-cuota')
+  async crearCuotaResidente(
+    @Body() body: { userId: string; userName: string; userEmail: string }
+  ) {
+    return this.pagoMensualService.crearCuotaMensualResidente(
+      body.userId,
+      body.userName,
+      body.userEmail
+    );
+  }
+
+  /**
    * 🏠 RESIDENTES: Crear sesión de pago para cuota mensual
    */
   @Post('residente/cuota')
