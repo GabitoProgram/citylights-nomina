@@ -19,6 +19,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^4.0.0",
     "@prisma/client": "^5.0.0",
+    "@sendgrid/mail": "^8.1.6",
     "@types/pdfkit": "^0.17.3",
     "@types/qrcode": "^1.5.5",
     "class-transformer": "^0.5.1",

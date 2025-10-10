@@ -5,6 +5,7 @@ import * as QRCode from 'qrcode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { jsPDF } from 'jspdf';
 
 @Injectable()
 export class FacturaNominaService {

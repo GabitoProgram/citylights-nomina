@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import Stripe from 'stripe';
 import { FacturaNominaService } from '../factura/factura-nomina.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class PagoMensualService {
@@ -13,7 +14,8 @@ export class PagoMensualService {
   constructor(
     private prisma: PrismaService,
     private httpService: HttpService,
-    private facturaNominaService: FacturaNominaService
+    private facturaNominaService: FacturaNominaService,
+    private emailService: EmailService
   ) {
     // Inicializar Stripe
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -559,6 +561,27 @@ export class PagoMensualService {
       } catch (facturaError) {
         this.logger.error(`❌ Error generando factura para cuota ${cuotaActualizada.id}: ${facturaError.message}`);
         // No fallar la confirmación del pago por error en factura
+      }
+
+      // 📧 ENVIAR EMAIL DE CONFIRMACIÓN DE PAGO
+      try {
+        const emailDestino = cuotaActualizada.userEmail || 'gabrielcallisayadiaz@gmail.com';
+        
+        await this.emailService.enviarConfirmacionPagoCuota({
+          emailDestino: emailDestino,
+          nombreUsuario: cuotaActualizada.userName || 'Residente',
+          numeroPago: cuotaActualizada.stripeSessionId || cuotaActualizada.id.toString(),
+          mes: cuotaActualizada.mes.toString(),
+          año: cuotaActualizada.anio.toString(),
+          monto: cuotaActualizada.montoTotal || cuotaActualizada.monto,
+          metodoPago: 'Stripe (Tarjeta de Crédito/Débito)',
+          fechaPago: cuotaActualizada.fechaPago?.toLocaleDateString('es-ES') || new Date().toLocaleDateString('es-ES')
+        });
+        
+        this.logger.log(`📧 Email de confirmación de pago enviado a ${emailDestino} para cuota ${cuotaActualizada.id}`);
+      } catch (emailError) {
+        this.logger.error(`❌ Error enviando email de confirmación para cuota ${cuotaActualizada.id}: ${emailError.message}`);
+        // No fallar la confirmación del pago por error de email
       }
 
       return {
