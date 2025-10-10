@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import sgMail from '@sendgrid/mail';
+const sgMail = require('@sendgrid/mail');
 
 @Injectable()
 export class EmailService {
