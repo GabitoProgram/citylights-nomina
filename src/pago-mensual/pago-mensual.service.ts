@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import Stripe from 'stripe';
 import { FacturaNominaService } from '../factura/factura-nomina.service';
 import { EmailService } from '../email/email.service';
+import { CuotaConfigService } from '../cuota-config/cuota-config.service';
 
 @Injectable()
 export class PagoMensualService {
@@ -15,7 +16,8 @@ export class PagoMensualService {
     private prisma: PrismaService,
     private httpService: HttpService,
     private facturaNominaService: FacturaNominaService,
-    private emailService: EmailService
+    private emailService: EmailService,
+    private cuotaConfigService: CuotaConfigService
   ) {
     // Inicializar Stripe
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -168,6 +170,10 @@ export class PagoMensualService {
         }
       }
 
+      // Obtener el monto base configurado
+      const montoBase = await this.cuotaConfigService.obtenerMontoBase();
+      this.logger.log(`💰 Usando monto base configurado: $${montoBase}`);
+
       // Crear fecha de vencimiento (último día del mes)
       const fechaVencimiento = new Date(anio, mes, 0, 23, 59, 59); // Último día del mes
       
@@ -182,9 +188,9 @@ export class PagoMensualService {
           userEmail,
           anio,
           mes,
-          monto: 100.0, // Cuota base de $100
+          monto: montoBase, // Usar monto base configurado
           montoMorosidad: 0.0,
-          montoTotal: 100.0,
+          montoTotal: montoBase, // Total = monto base inicialmente
           estado: 'PENDIENTE',
           fechaVencimiento,
           fechaVencimientoGracia: fechaGracia,
