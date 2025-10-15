@@ -11,10 +11,12 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000', // Gateway local
       'http://localhost:3001', // Frontend dev
+      'http://localhost:5173', // Frontend Vite (puerto por defecto)
+      'http://localhost:5174', // Frontend Vite (puerto alternativo)
       'http://localhost:8080', // Frontend prod
-      'http://localhost:5173', // Frontend Vite
       'https://citylights-gateway-production.up.railway.app', // Gateway producción
-      'https://citylights-frontend-production.up.railway.app', // Frontend producción (si lo tienes)
+      'https://citylights-frontend-production.up.railway.app', // Frontend producción
+      'https://citylights-booking-frontend.up.railway.app', // Frontend Railway alternativo
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
