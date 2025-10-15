@@ -1,6 +1,7 @@
-import { Controller, Get, Put, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Put, Post, Delete, Body, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { CuotaConfigService } from './cuota-config.service';
 import { ActualizarCuotaDto } from './cuota-config.types';
+import { CrearConceptoDto, ActualizarConceptoDto } from './dto/concepto.dto';
 
 @Controller('cuota-config')
 export class CuotaConfigController {
@@ -61,6 +62,108 @@ export class CuotaConfigController {
       
       throw new HttpException(
         'Error interno al actualizar la configuración',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  // 📋 Obtener todos los conceptos disponibles
+  @Get('conceptos')
+  async obtenerConceptosDisponibles() {
+    try {
+      console.log('📋 Obteniendo conceptos disponibles...');
+      const conceptos = await this.cuotaConfigService.obtenerConceptosDisponibles();
+      
+      return {
+        success: true,
+        data: conceptos,
+        message: 'Conceptos obtenidos exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error al obtener conceptos:', error);
+      throw new HttpException(
+        'Error al obtener los conceptos disponibles',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  // ➕ Agregar nuevo concepto
+  @Post('conceptos')
+  async agregarConcepto(@Body() conceptoDto: CrearConceptoDto) {
+    try {
+      console.log('➕ Agregando nuevo concepto:', conceptoDto);
+      const nuevoConcepto = await this.cuotaConfigService.agregarConcepto(conceptoDto);
+      
+      return {
+        success: true,
+        data: nuevoConcepto,
+        message: `Concepto '${nuevoConcepto.label}' agregado exitosamente`
+      };
+    } catch (error) {
+      console.error('❌ Error al agregar concepto:', error);
+      
+      if (error.status) {
+        throw error;
+      }
+      
+      throw new HttpException(
+        'Error interno al agregar el concepto',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  // ✏️ Actualizar concepto existente
+  @Put('conceptos/:key')
+  async actualizarConcepto(
+    @Param('key') key: string,
+    @Body() conceptoDto: ActualizarConceptoDto
+  ) {
+    try {
+      console.log(`✏️ Actualizando concepto '${key}':`, conceptoDto);
+      const conceptoActualizado = await this.cuotaConfigService.actualizarConcepto(key, conceptoDto);
+      
+      return {
+        success: true,
+        data: conceptoActualizado,
+        message: `Concepto '${key}' actualizado exitosamente`
+      };
+    } catch (error) {
+      console.error('❌ Error al actualizar concepto:', error);
+      
+      if (error.status) {
+        throw error;
+      }
+      
+      throw new HttpException(
+        'Error interno al actualizar el concepto',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  // 🗑️ Eliminar concepto
+  @Delete('conceptos/:key')
+  async eliminarConcepto(@Param('key') key: string) {
+    try {
+      console.log(`🗑️ Eliminando concepto '${key}'...`);
+      const resultado = await this.cuotaConfigService.eliminarConcepto(key);
+      
+      return {
+        success: true,
+        data: resultado,
+        message: resultado.mensaje
+      };
+    } catch (error) {
+      console.error('❌ Error al eliminar concepto:', error);
+      
+      if (error.status) {
+        throw error;
+      }
+      
+      throw new HttpException(
+        'Error interno al eliminar el concepto',
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }

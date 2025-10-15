@@ -87,3 +87,14 @@ model CuotaMensualResidente {
   
   @@unique([userId, anio, mes]) // Solo una cuota por residente por mes
 }
+
+// Nueva tabla para metadata de conceptos dinámicos
+model ConceptosMetadata {
+  id                Int      @id @default(autoincrement())
+  key               String   @unique @db.VarChar(50)
+  label             String   @db.VarChar(100)
+  descripcion       String?
+  activo            Boolean  @default(true)
+  fechaCreacion     DateTime @default(now())
+  fechaActualizacion DateTime @updatedAt
+}
