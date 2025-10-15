@@ -1,6 +1,6 @@
-import { Controller, Get, Put, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
 import { CuotaConfigService } from './cuota-config.service';
-import { ActualizarCuotaDto } from './cuota-config.types';
+import { ActualizarCuotaDto, ConceptoMetadata } from './cuota-config.types';
 
 @Controller('cuota-config')
 export class CuotaConfigController {
@@ -30,6 +30,58 @@ export class CuotaConfigController {
     }
   }
 
+  // 🆕 Obtener conceptos disponibles
+  @Get('conceptos')
+  async obtenerConceptosDisponibles() {
+    try {
+      console.log('📋 Obteniendo conceptos disponibles...');
+      const conceptos = await this.cuotaConfigService.obtenerConceptosDisponibles();
+      
+      return {
+        success: true,
+        data: conceptos,
+        message: 'Conceptos obtenidos exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error al obtener conceptos:', error);
+      throw new HttpException(
+        'Error al obtener los conceptos disponibles',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  // 🆕 Agregar nuevo concepto personalizado
+  @Post('conceptos')
+  async agregarConceptoPersonalizado(@Body() nuevoConcepto: Omit<ConceptoMetadata, 'orden'>) {
+    try {
+      console.log('🆕 Agregando nuevo concepto personalizado...');
+      console.log('📝 Datos recibidos:', nuevoConcepto);
+
+      // Validaciones básicas
+      if (!nuevoConcepto.key || !nuevoConcepto.label) {
+        throw new HttpException(
+          'Key y label son requeridos',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      const conceptoCreado = await this.cuotaConfigService.agregarConceptoPersonalizado(nuevoConcepto);
+
+      return {
+        success: true,
+        data: conceptoCreado,
+        message: 'Concepto agregado exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error al agregar concepto:', error);
+      throw new HttpException(
+        'Error al agregar el nuevo concepto',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   @Put()
   async actualizarConfiguracion(@Body() actualizarCuotaDto: ActualizarCuotaDto) {
     try {
@@ -37,7 +89,7 @@ export class CuotaConfigController {
       console.log('📝 Datos recibidos:', actualizarCuotaDto);
 
       // Validar que todos los valores sean números positivos
-      const conceptos = Object.values(actualizarCuotaDto);
+      const conceptos = Object.values(actualizarCuotaDto).filter(val => val !== undefined);
       if (conceptos.some(valor => typeof valor !== 'number' || valor < 0)) {
         throw new HttpException(
           'Todos los valores deben ser números positivos',

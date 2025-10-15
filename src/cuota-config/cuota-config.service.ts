@@ -1,39 +1,91 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConceptosCuota, ConfiguracionCuota } from './cuota-config.types';
+import { ConceptosCuota, ConfiguracionCuota, CONCEPTOS_PREDEFINIDOS, ConceptoMetadata } from './cuota-config.types';
 
 @Injectable()
 export class CuotaConfigService {
   constructor(private prisma: PrismaService) {}
 
-  // Obtener la configuración actual de la cuota
+  // 🆕 Obtener conceptos disponibles (predefinidos + personalizados)
+  async obtenerConceptosDisponibles(): Promise<ConceptoMetadata[]> {
+    try {
+      // Por ahora retornamos solo los predefinidos, pero puedes extender esto
+      // para incluir conceptos personalizados almacenados en la base de datos
+      return CONCEPTOS_PREDEFINIDOS;
+    } catch (error) {
+      console.error('Error al obtener conceptos disponibles:', error);
+      return CONCEPTOS_PREDEFINIDOS;
+    }
+  }
+
+  // 🆕 Agregar un nuevo concepto personalizado
+  async agregarConceptoPersonalizado(nuevoConcepto: Omit<ConceptoMetadata, 'orden'>): Promise<ConceptoMetadata> {
+    try {
+      // Calcular el siguiente orden
+      const conceptosExistentes = await this.obtenerConceptosDisponibles();
+      const siguienteOrden = Math.max(...conceptosExistentes.map(c => c.orden)) + 1;
+
+      const conceptoCompleto: ConceptoMetadata = {
+        ...nuevoConcepto,
+        orden: siguienteOrden
+      };
+
+      // Aquí podrías guardar en la base de datos si implementas persistencia
+      console.log('🆕 Nuevo concepto agregado:', conceptoCompleto);
+      
+      return conceptoCompleto;
+    } catch (error) {
+      console.error('Error al agregar concepto personalizado:', error);
+      throw error;
+    }
+  }
+
+  // Obtener la configuración actual de la cuota (MEJORADO)
   async obtenerConfiguracion(): Promise<ConfiguracionCuota | null> {
     try {
-      // Por ahora simulamos la configuración, pero puedes crear una tabla específica si necesitas
-      // Aquí obtenemos el monto base de la primera cuota encontrada o usamos valores por defecto
-      const primeraConfiguracion = {
+      // Obtener conceptos disponibles
+      const conceptosDisponibles = await this.obtenerConceptosDisponibles();
+      
+      // Crear configuración con todos los conceptos disponibles
+      const conceptos: ConceptosCuota = {};
+      
+      // Inicializar conceptos predefinidos
+      conceptosDisponibles.forEach(concepto => {
+        if (concepto.activo) {
+          conceptos[concepto.key] = this.obtenerValorPorDefecto(concepto.key);
+        }
+      });
+
+      const configuracion = {
         id: 1,
-        conceptos: {
-          jardinFrente: 15.0,
-          jardinGeneral: 20.0,
-          recojoBasura: 25.0,
-          limpieza: 30.0,
-          luzGradas: 10.0,
-          cera: 5.0,
-          ace: 8.0,
-          lavanderia: 12.0,
-          ahorroAdministracion: 20.0,
-          agua: 35.0
-        },
-        montoTotal: 180.0,
+        conceptos,
+        montoTotal: Object.values(conceptos).reduce((sum, value) => sum + (value || 0), 0),
         fechaActualizacion: new Date()
       };
 
-      return primeraConfiguracion;
+      return configuracion;
     } catch (error) {
       console.error('Error al obtener configuración de cuota:', error);
       return null;
     }
+  }
+
+  // 🆕 Obtener valor por defecto para un concepto
+  private obtenerValorPorDefecto(key: string): number {
+    const valoresPorDefecto: Record<string, number> = {
+      jardinFrente: 15.0,
+      jardinGeneral: 20.0,
+      recojoBasura: 25.0,
+      limpieza: 30.0,
+      luzGradas: 10.0,
+      cera: 5.0,
+      ace: 8.0,
+      lavanderia: 12.0,
+      ahorroAdministracion: 20.0,
+      agua: 35.0
+    };
+    
+    return valoresPorDefecto[key] || 0.0;
   }
 
   // Actualizar la configuración de la cuota
