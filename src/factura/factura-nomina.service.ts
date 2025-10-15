@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CuotaConfigService } from '../cuota-config/cuota-config.service';
 import PDFDocument from 'pdfkit';
 import * as QRCode from 'qrcode';
 import * as fs from 'fs';
@@ -12,10 +11,7 @@ import { jsPDF } from 'jspdf';
 export class FacturaNominaService {
   private readonly logger = new Logger(FacturaNominaService.name);
 
-  constructor(
-    private prisma: PrismaService,
-    private cuotaConfigService: CuotaConfigService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Generar factura boliviana automáticamente después de confirmar un pago de nómina
@@ -330,7 +326,7 @@ export class FacturaNominaService {
   }
 
   /**
-   * Generar PDF de factura para cuota de residente con desglose detallado
+   * Generar PDF de factura para cuota de residente
    */
   async generarPDFCuotaResidente(datos: {
     numeroFactura: string;
@@ -350,129 +346,6 @@ export class FacturaNominaService {
     try {
       this.logger.log(`🔄 Generando PDF para cuota ${datos.cuotaId}: ${datos.numeroFactura}`);
       this.logger.log(`📝 Datos recibidos: ${JSON.stringify(datos)}`);
-
-      // 🆕 OBTENER CONFIGURACIÓN DE CONCEPTOS DE CUOTA
-      let detallesFactura = datos.detalles;
-      
-      if (!detallesFactura) {
-        try {
-          const configuracion = await this.cuotaConfigService.obtenerConfiguracion();
-          
-          if (configuracion?.conceptos) {
-            // Crear detalles basados en la configuración actual
-            detallesFactura = [];
-            const conceptos = configuracion.conceptos;
-            
-            // Solo agregar conceptos que tengan valor mayor a 0
-            if (conceptos.jardinFrente > 0) {
-              detallesFactura.push({
-                descripcion: 'Jardín Frente',
-                cantidad: 1,
-                precio: conceptos.jardinFrente,
-                total: conceptos.jardinFrente
-              });
-            }
-            
-            if (conceptos.jardinGeneral > 0) {
-              detallesFactura.push({
-                descripcion: 'Jardín General',
-                cantidad: 1,
-                precio: conceptos.jardinGeneral,
-                total: conceptos.jardinGeneral
-              });
-            }
-            
-            if (conceptos.recojoBasura > 0) {
-              detallesFactura.push({
-                descripcion: 'Recojo de Basura',
-                cantidad: 1,
-                precio: conceptos.recojoBasura,
-                total: conceptos.recojoBasura
-              });
-            }
-            
-            if (conceptos.limpieza > 0) {
-              detallesFactura.push({
-                descripcion: 'Limpieza',
-                cantidad: 1,
-                precio: conceptos.limpieza,
-                total: conceptos.limpieza
-              });
-            }
-            
-            if (conceptos.luzGradas > 0) {
-              detallesFactura.push({
-                descripcion: 'Luz Gradas',
-                cantidad: 1,
-                precio: conceptos.luzGradas,
-                total: conceptos.luzGradas
-              });
-            }
-            
-            if (conceptos.cera > 0) {
-              detallesFactura.push({
-                descripcion: 'Cera',
-                cantidad: 1,
-                precio: conceptos.cera,
-                total: conceptos.cera
-              });
-            }
-            
-            if (conceptos.ace > 0) {
-              detallesFactura.push({
-                descripcion: 'Ace',
-                cantidad: 1,
-                precio: conceptos.ace,
-                total: conceptos.ace
-              });
-            }
-            
-            if (conceptos.lavanderia > 0) {
-              detallesFactura.push({
-                descripcion: 'Lavandería',
-                cantidad: 1,
-                precio: conceptos.lavanderia,
-                total: conceptos.lavanderia
-              });
-            }
-            
-            if (conceptos.ahorroAdministracion > 0) {
-              detallesFactura.push({
-                descripcion: 'Ahorro Administración',
-                cantidad: 1,
-                precio: conceptos.ahorroAdministracion,
-                total: conceptos.ahorroAdministracion
-              });
-            }
-            
-            if (conceptos.agua > 0) {
-              detallesFactura.push({
-                descripcion: 'Agua',
-                cantidad: 1,
-                precio: conceptos.agua,
-                total: conceptos.agua
-              });
-            }
-            
-            this.logger.log(`✅ Desglose de conceptos obtenido: ${detallesFactura.length} items`);
-          }
-        } catch (configError) {
-          this.logger.warn(`⚠️ No se pudo obtener configuración de conceptos: ${configError.message}`);
-          // Usar valor por defecto si no hay configuración
-        }
-      }
-      
-      // Si no hay detalles específicos, usar datos por defecto
-      if (!detallesFactura || detallesFactura.length === 0) {
-        detallesFactura = [
-          {
-            descripcion: datos.concepto,
-            cantidad: 1,
-            precio: datos.total,
-            total: datos.total
-          }
-        ];
-      }
 
       return new Promise((resolve, reject) => {
         const doc = new PDFDocument({
@@ -541,7 +414,16 @@ export class FacturaNominaService {
 
         yPosition += 15;
 
-        // Usar los detalles configurados
+        // Detalles o datos por defecto
+        const detallesFactura = datos.detalles || [
+          {
+            descripcion: datos.concepto,
+            cantidad: 1,
+            precio: datos.total,
+            total: datos.total
+          }
+        ];
+
         doc.fontSize(10)
            .fillColor('#000000');
 

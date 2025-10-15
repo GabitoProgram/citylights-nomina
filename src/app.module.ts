@@ -6,7 +6,6 @@ import { PagarModule } from './pagar/pagar.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { PagoMensualModule } from './pago-mensual/pago-mensual.module';
 import { CuotaConfigModule } from './cuota-config/cuota-config.module';
-import { CuotaConfigService } from './cuota-config/cuota-config.service';
 import { PagoController } from './pago/pago.controller';
 import { PagoService } from './pago/pago.service';
 import { PdfController } from './pdf/pdf.controller';
@@ -31,7 +30,6 @@ import { TasksService } from './tasks/tasks.service';
     PagoService, 
     PdfService, 
     FacturaNominaService, 
-    CuotaConfigService,
     PrismaService,
     TasksService
   ],
